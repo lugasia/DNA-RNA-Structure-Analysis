@@ -19,8 +19,19 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
+from datetime import datetime
 
-logging.getLogger('streamlit').setLevel(logging.ERROR)
+# Configure logging for Streamlit Cloud
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Set page config for better performance
+st.set_page_config(
+    page_title="RNA Structure Analysis Tool",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # At the top of your file, after imports:
 if 'results_df' not in st.session_state:
@@ -34,27 +45,36 @@ if 'status' not in st.session_state:
 if 'current_findings' not in st.session_state:
     st.session_state.current_findings = None
 
-# Performance settings
+# Performance settings optimized for Streamlit Cloud
 if 'PERFORMANCE_CONFIG' not in st.session_state:
     st.session_state.PERFORMANCE_CONFIG = {
-        'batch_size': 1000,
-        'update_frequency': 2000,  # Update UI every 2000 sequences
-        'max_workers': multiprocessing.cpu_count(),
-        'chunk_size': 1000000
+        'batch_size': 500,  # Reduced batch size for better memory management
+        'update_frequency': 1000,  # More frequent updates
+        'max_workers': min(multiprocessing.cpu_count(), 4),  # Limit workers for cloud
+        'chunk_size': 500000  # Reduced chunk size
     }
 
 # Add caching for expensive calculations
-@lru_cache(maxsize=1024)
-def calculate_inverse_fold(seq: str) -> float:
+@st.cache_data(ttl=3600, show_spinner=True)
+def calculate_inverse_fold(sequence: str, target_structure: str) -> tuple:
+    """
+    Calculate inverse folding for a given sequence and target structure.
+    Cached for 1 hour to improve performance.
+    """
     try:
-        structure, mfe = RNA.fold(seq)
-        return mfe
-    except Exception:
-        return None
+        result = RNA.inverse_fold(sequence, target_structure)
+        return result
+    except Exception as e:
+        logger.error(f"Error in inverse fold calculation: {str(e)}")
+        return None, None
 
 # RNA Structure Visualization Functions
-def plot_rna_structure(sequence, structure):
-    """Generate a basic plot of RNA secondary structure"""
+@st.cache_data(ttl=3600, show_spinner=True)
+def plot_rna_structure(sequence: str, structure: str) -> BytesIO:
+    """
+    Generate RNA structure plot.
+    Cached for 1 hour to improve performance.
+    """
     try:
         # Create figure
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -100,7 +120,7 @@ def plot_rna_structure(sequence, structure):
         buf.seek(0)
         return buf
     except Exception as e:
-        st.error(f"Error generating structure plot: {str(e)}")
+        logger.error(f"Error in structure plotting: {str(e)}")
         return None
 
 def display_structure(sequence, structure, delta_g):
@@ -892,3 +912,63 @@ def check_valid_numerical_data(df, column):
     if len(valid_data) < 8:
         return False, f"Need at least 8 valid samples (current: {len(valid_data)})"
     return True, valid_data
+
+def main():
+    try:
+        st.title("RNA Inverse Folding")
+        
+        # Initialize session state
+        if 'results' not in st.session_state:
+            st.session_state.results = []
+        
+        # Input section
+        with st.form("input_form"):
+            sequence = st.text_input("Enter RNA sequence:", 
+                                   help="Enter a valid RNA sequence (A, U, G, C)")
+            target_structure = st.text_input("Enter target structure:",
+                                           help="Enter target structure in dot-bracket notation")
+            submitted = st.form_submit_button("Calculate")
+        
+        if submitted:
+            if not sequence or not target_structure:
+                st.warning("Please enter both sequence and target structure.")
+                return
+            
+            if not is_valid_sequence(sequence):
+                st.error("Invalid RNA sequence. Please use only A, U, G, C characters.")
+                return
+            
+            if not is_valid_structure(target_structure):
+                st.error("Invalid structure format. Please use dot-bracket notation.")
+                return
+            
+            with st.spinner("Calculating inverse fold..."):
+                result = calculate_inverse_fold(sequence, target_structure)
+                if result:
+                    st.session_state.results.append({
+                        'sequence': sequence,
+                        'structure': target_structure,
+                        'result': result,
+                        'timestamp': datetime.now()
+                    })
+        
+        # Display results
+        if st.session_state.results:
+            st.subheader("Results")
+            for idx, result in enumerate(reversed(st.session_state.results)):
+                with st.expander(f"Result {idx + 1} - {result['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"):
+                    st.write(f"Sequence: {result['sequence']}")
+                    st.write(f"Target Structure: {result['structure']}")
+                    st.write(f"Inverse Fold Result: {result['result']}")
+                    
+                    # Plot structure
+                    plot = plot_rna_structure(result['sequence'], result['structure'])
+                    if plot:
+                        st.image(plot, use_column_width=True)
+    
+    except Exception as e:
+        logger.error(f"Application error: {str(e)}")
+        st.error("An unexpected error occurred. Please try again later.")
+
+if __name__ == "__main__":
+    main()
