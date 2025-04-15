@@ -21,13 +21,11 @@ A powerful web-based application for analyzing RNA sequences and structures, bui
 ## Screenshots
 
 ### Main Interface
-[Insert screenshot of the main interface]
+![Screenshot 2025-04-15 at 17 38 13](https://github.com/user-attachments/assets/996429df-b972-4680-9a95-d75c23c40f84)
 
-### Structure Visualization
-[Insert screenshot of RNA structure visualization]
 
 ### Analysis Results
-[Insert screenshot of analysis results]
+![image](https://github.com/user-attachments/assets/ba5dfad7-faf9-48a4-a6c7-6ab4538b5c59)
 
 ## Installation
 
