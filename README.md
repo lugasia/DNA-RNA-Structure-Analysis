@@ -75,14 +75,10 @@ streamlit run app.py
 - Plotly
 - SciPy
 
-## Contributing
+## Donation
 
-Feel free to submit issues and enhancement requests!
-
-## License
-
-[Insert your chosen license]
+![Screenshot 2025-04-15 at 18 14 07](https://github.com/user-attachments/assets/aeb72767-8065-49c6-819c-9abac4baf444)
 
 ## Contact
 
-[Insert your contact information] 
+amir@logbit.info
